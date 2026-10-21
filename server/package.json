@@ -1,0 +1,21 @@
+{
+  "name": "stay-ledger",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed": "node db/seed.js",
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.6",
+    "express": "^4.21.2",
+    "uuid": "^14.0.3"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.5"
+  }
+}
