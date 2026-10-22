@@ -35,7 +35,7 @@ export function CreatePropertyModal({ isOpen, onClose }) {
     }
 
     if (!address.trim()) {
-      setValidationError("Address is required.");
+      setValidationError("Locality / Address is required.");
       return;
     }
 
@@ -59,33 +59,33 @@ export function CreatePropertyModal({ isOpen, onClose }) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Create Property"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-2xs transition-opacity"
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Surface Card */}
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl transition">
+      <div className="relative z-10 w-full max-w-sm rounded-t-[32px] sm:rounded-[32px] border border-slate-200/90 bg-white p-5 shadow-2xl transition dark:border-neutral-800 dark:bg-[#16171C]">
+        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden dark:bg-neutral-700" />
+
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-              <Building2 className="h-4 w-4" />
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-neutral-800">
+          <div className="flex items-center space-x-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FF5E36]/10 text-[#FF5E36]">
+              <Building2 className="h-4 w-4 stroke-[2.2]" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">
-              Add New Property
+            <h3 className="text-sm font-black text-slate-900 dark:text-white">
+              Create New Branch
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close dialog"
-            className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="spring-press flex h-7 w-7 items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:text-slate-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -93,71 +93,62 @@ export function CreatePropertyModal({ isOpen, onClose }) {
 
         {/* Error Banners */}
         {apiError && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+          <div className="mt-3 flex items-start space-x-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-400">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" />
             <span>{apiError.message || "Failed to create property."}</span>
           </div>
         )}
 
         {validationError && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+          <div className="mt-3 flex items-start space-x-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
             <span>{validationError}</span>
           </div>
         )}
 
-        {/* Form Inputs */}
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col space-y-3">
           <div>
-            <label
-              htmlFor="property-name"
-              className="text-xs font-semibold text-slate-700 block"
-            >
-              Property Name *
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              Branch Name *
             </label>
             <input
-              id="property-name"
               type="text"
               required
-              placeholder="e.g. Greenview Executive Stay"
+              placeholder="e.g. Sri Sai Emerald PG"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-900 shadow-2xs transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="h-10 w-full rounded-2xl border border-slate-200/90 bg-white px-3.5 text-xs font-bold text-slate-900 shadow-xs focus:border-[#FF5E36] focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
             />
           </div>
 
           <div>
-            <label
-              htmlFor="property-address"
-              className="text-xs font-semibold text-slate-700 block"
-            >
-              Full Address *
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              Locality / Address *
             </label>
-            <textarea
-              id="property-address"
-              rows={2}
+            <input
+              type="text"
               required
-              placeholder="e.g. 123 Outer Ring Rd, Bellandur, Bengaluru"
+              placeholder="e.g. Marathahalli Outer Ring Rd"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium text-slate-900 shadow-2xs transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="h-10 w-full rounded-2xl border border-slate-200/90 bg-white px-3.5 text-xs font-bold text-slate-900 shadow-xs focus:border-[#FF5E36] focus:outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
             />
           </div>
 
-          {/* Form Actions */}
-          <div className="mt-2 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+          <div className="flex items-center justify-end space-x-2 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="rounded-xl px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 active:scale-95 disabled:pointer-events-none"
+              className="spring-press rounded-xl px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
+              className="spring-press inline-flex items-center space-x-1.5 rounded-2xl bg-[#FF5E36] px-4 py-2 text-xs font-extrabold text-white shadow-[0_8px_20px_-4px_rgba(255,94,54,0.38)] disabled:opacity-50"
             >
               {isPending ? (
                 <>
@@ -165,7 +156,7 @@ export function CreatePropertyModal({ isOpen, onClose }) {
                   <span>Creating...</span>
                 </>
               ) : (
-                <span>Create Property</span>
+                <span>Create Branch</span>
               )}
             </button>
           </div>

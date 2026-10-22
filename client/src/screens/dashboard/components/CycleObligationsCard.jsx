@@ -1,74 +1,64 @@
-import { useMemo } from "react";
-import { AlertCircle, IndianRupee, Users } from "lucide-react";
 import { formatPaiseToRupees } from "../../../shared/formatters.js";
 
-export function CycleObligationsCard({ floors = [] }) {
-  const metrics = useMemo(() => {
-    let totalBeds = 0;
-    let occupiedBeds = 0;
-    let totalOutstandingPaise = 0;
-    let totalOverduePaise = 0;
-
-    for (const floor of floors) {
-      for (const room of floor.rooms || []) {
-        for (const bed of room.beds || []) {
-          if (bed.isActive) {
-            totalBeds += 1;
-            if (bed.status === "OCCUPIED" && bed.tenant) {
-              occupiedBeds += 1;
-              totalOutstandingPaise += bed.tenant.totalOutstandingPaise || 0;
-              totalOverduePaise += bed.tenant.overduePaise || 0;
-            }
-          }
-        }
-      }
-    }
-
-    return {
-      totalBeds,
-      occupiedBeds,
-      vacantBeds: totalBeds - occupiedBeds,
-      totalOutstandingPaise,
-      totalOverduePaise,
-    };
-  }, [floors]);
+export function CycleObligationsCard({ summary = {} }) {
+  const financials = summary.financials || {};
+  const totalObligationsPaise = financials.totalObligationsPaise ?? 0;
+  const totalCollectedPaise = financials.totalCollectedPaise ?? 0;
+  const totalPendingPaise = financials.totalPendingPaise ?? 0;
 
   return (
-    <section className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:grid-cols-3">
-      <div className="flex flex-col justify-between rounded-xl bg-slate-50 p-3">
-        <div className="flex items-center gap-2 text-slate-500">
-          <Users className="h-4 w-4" />
-          <span className="text-xs font-medium">Occupancy</span>
+    <div className="relative overflow-hidden rounded-[32px] border border-slate-200/90 bg-white p-5 shadow-[0_16px_36px_-4px_rgba(15,23,42,0.10)] dark:border-neutral-800 dark:bg-[#16171C]">
+      {/* Brand Coral Glow */}
+      <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#FF5E36]/10 blur-2xl" />
+
+      {/* Main Obligation Stats */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+              Cycle Rent Obligations
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#FF5E36]/20 bg-[#FF5E36]/10 px-2 py-0.5 text-[10px] font-bold text-[#E64720] dark:text-[#FF7A59]">
+              Active Cycle
+            </span>
+          </div>
+          <div className="mt-1 text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+            {formatPaiseToRupees(totalObligationsPaise)}
+          </div>
         </div>
-        <div className="mt-2 flex items-baseline gap-1.5">
-          <span className="text-xl font-bold text-slate-900">
-            {metrics.occupiedBeds}
-          </span>
-          <span className="text-xs font-semibold text-slate-400">
-            / {metrics.totalBeds} beds
-          </span>
+
+        {/* Mini Histogram */}
+        <div className="flex h-12 items-end space-x-1.5 px-1 pt-2">
+          <div className="h-6 w-2.5 rounded-full hero-stat-bar opacity-50" />
+          <div className="h-8 w-2.5 rounded-full hero-stat-bar opacity-70" />
+          <div className="h-11 w-2.5 rounded-full hero-stat-bar shadow-[0_0_10px_rgba(255,94,54,0.4)]" />
+          <div className="h-7 w-2.5 rounded-full hero-stat-bar opacity-60" />
+          <div className="h-9 w-2.5 rounded-full hero-stat-bar opacity-85" />
         </div>
       </div>
 
-      <div className="flex flex-col justify-between rounded-xl bg-amber-50/60 p-3">
-        <div className="flex items-center gap-2 text-amber-700">
-          <IndianRupee className="h-4 w-4" />
-          <span className="text-xs font-medium">Pending Dues</span>
+      {/* Collected vs Pending Bottom Strip */}
+      <div className="-mx-5 -mb-5 mt-4 flex items-center justify-between rounded-b-[32px] border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-xs dark:border-neutral-800/80 dark:bg-neutral-900/40">
+        <div className="flex items-center space-x-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-xs" />
+          <span className="font-semibold text-slate-500 dark:text-neutral-400">
+            Collected:
+          </span>
+          <span className="font-bold text-slate-900 dark:text-neutral-200">
+            {formatPaiseToRupees(totalCollectedPaise)}
+          </span>
         </div>
-        <div className="mt-2 text-xl font-bold text-amber-900">
-          {formatPaiseToRupees(metrics.totalOutstandingPaise)}
-        </div>
-      </div>
 
-      <div className="col-span-2 flex flex-col justify-between rounded-xl bg-rose-50/60 p-3 sm:col-span-1">
-        <div className="flex items-center gap-2 text-rose-700">
-          <AlertCircle className="h-4 w-4" />
-          <span className="text-xs font-medium">Overdue</span>
-        </div>
-        <div className="mt-2 text-xl font-bold text-rose-900">
-          {formatPaiseToRupees(metrics.totalOverduePaise)}
+        <div className="flex items-center space-x-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#FF5E36] shadow-xs" />
+          <span className="font-semibold text-slate-500 dark:text-neutral-400">
+            Pending:
+          </span>
+          <span className="font-black text-[#E64720] dark:text-[#FF7A59]">
+            {formatPaiseToRupees(totalPendingPaise)}
+          </span>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet } from "lucide-react";
+import { Download, FileSpreadsheet, ArrowUpRight } from "lucide-react";
 
 export function ExportDataSection({ occupancy, propertyName }) {
   function exportOccupancyCSV() {
@@ -39,7 +39,7 @@ export function ExportDataSection({ occupancy, propertyName }) {
     link.setAttribute("href", encodedUri);
     link.setAttribute(
       "download",
-      `${propertyName || "property"}_occupancy_snapshot.csv`,
+      `${(propertyName || "property").toLowerCase().replace(/\s+/g, "_")}_occupancy_roster.csv`,
     );
     document.body.appendChild(link);
     link.click();
@@ -47,31 +47,44 @@ export function ExportDataSection({ occupancy, propertyName }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
-      <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-          <FileSpreadsheet className="h-4 w-4" />
+    <div className="relative overflow-hidden rounded-[28px] border border-slate-200/90 bg-white p-4 shadow-[0_4px_18px_-2px_rgba(15,23,42,0.06)] dark:border-neutral-800 dark:bg-[#16171C]">
+      <div className="flex items-center space-x-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+          <FileSpreadsheet className="h-4.5 w-4.5 stroke-[2.2]" />
         </div>
-        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-          Export & Reports
-        </h3>
+        <div>
+          <h3 className="text-sm font-black text-slate-900 dark:text-white leading-none">
+            Data Exports
+          </h3>
+          <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+            Download local audit spreadsheets
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+      <div className="mt-3.5">
         <button
           type="button"
           onClick={exportOccupancyCSV}
-          className="flex flex-1 items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-slate-300 hover:bg-slate-100 active:scale-98"
+          className="group flex w-full items-center justify-between rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3 text-left transition-all hover:border-[#FF5E36]/40 hover:bg-white active:scale-[0.98] dark:border-neutral-800 dark:bg-neutral-900/50 dark:hover:bg-neutral-800"
         >
-          <div>
-            <span className="text-xs font-bold text-slate-800 block">
-              Occupancy Snapshot
-            </span>
-            <span className="text-[11px] text-slate-500">
-              Download room/bed roster as CSV
-            </span>
+          <div className="flex items-center space-x-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-2xs dark:bg-neutral-800">
+              <Download className="h-4 w-4 stroke-[2.2]" />
+            </div>
+            <div>
+              <span className="block text-xs font-black text-slate-900 dark:text-white">
+                Occupancy Roster (.CSV)
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400">
+                Live floor, room, tenant & due balances
+              </span>
+            </div>
           </div>
-          <Download className="h-4 w-4 text-slate-400" />
+
+          <div className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-400 shadow-2xs group-hover:bg-[#FF5E36] group-hover:text-white group-hover:border-transparent transition-all dark:border-transparent dark:bg-neutral-800">
+            <ArrowUpRight className="h-3.5 w-3.5 stroke-[2.2]" />
+          </div>
         </button>
       </div>
     </div>

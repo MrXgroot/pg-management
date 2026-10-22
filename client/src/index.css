@@ -1,1 +1,82 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,700&display=swap");
+
 @import "tailwindcss";
+
+/* 1. Class-based Dark Mode configuration */
+@variant dark (&:where(.dark, .dark *));
+
+/* 2. Theme Token Definitions */
+@theme {
+  --font-sans:
+    "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+
+  /* Custom Brand & Accent Colors */
+  --color-brand-400: #ff7a59;
+  --color-brand-500: #ff5e36;
+  --color-brand-600: #e64720;
+  --color-brand-700: #c73612;
+
+  --color-surface-canvas: #f1f4f9;
+  --color-surface-card: #ffffff;
+  --color-surface-subtle: #f8fafc;
+  --color-surface-border: #e2e8f0;
+
+  --color-onyx-800: #1a1c20;
+  --color-onyx-900: #16171c;
+  --color-onyx-950: #111215;
+
+  /* Custom Box Shadows */
+  --shadow-card:
+    0 4px 16px -2px rgba(15, 23, 42, 0.06),
+    0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-floating:
+    0 16px 36px -4px rgba(15, 23, 42, 0.09),
+    0 4px 12px -2px rgba(15, 23, 42, 0.03);
+  --shadow-glow-coral: 0 10px 25px -4px rgba(255, 94, 54, 0.38);
+
+  /* Custom Radii */
+  --radius-20: 20px;
+  --radius-24: 24px;
+  --radius-28: 28px;
+  --radius-32: 32px;
+  --radius-36: 36px;
+  --radius-44: 44px;
+}
+
+/* 3. Global Typography & Utilities */
+@utility hero-stat-bar {
+  background: linear-gradient(
+    180deg,
+    #ff6f48 0%,
+    #ff9776 60%,
+    rgba(255, 178, 153, 0.15) 100%
+  );
+}
+
+@utility spring-press {
+  transition:
+    transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+html,
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
