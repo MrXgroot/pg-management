@@ -1,3 +1,5 @@
+# Historical snapshot — superseded by [docs/README.md](README.md) and its [current frontend/testing reference](context/04_FRONTEND_AND_TESTING_REFERENCE.md). Kept for history; source code is authoritative.
+
 # Stay Ledger V1 Frontend: Comprehensive Architectural & Functional Audit
 
 ---

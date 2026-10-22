@@ -1,3 +1,5 @@
+# Historical snapshot — superseded by [docs/README.md](README.md) and its [current domain/API contract](context/02_API_AND_DATA_CONTRACTS.md). Kept for history; source code is authoritative.
+
 # Implemented API and Client Contracts — Stay Ledger V1
 
 Authoritative API contract, payload schemas, TanStack Query cache policies, and shared client utilities for the React client application (`client/src/`) connecting to the Stay Ledger V1 Express backend (`/api/v1`).

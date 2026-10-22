@@ -1,3 +1,5 @@
+# Historical snapshot — superseded by [docs/README.md](README.md) and its [current persistence/core reference](context/03_DATABASE_AND_CORE_REFERENCE.md). Kept for history; source code is authoritative.
+
 # Implemented Repositories Contract Snapshot — Stay Ledger V1
 
 This document is the authoritative implementation specification for the verified database schema, pure policies, and persistence repositories in `stay-ledger-v1`. Use this specification directly to construct transactional write workflows (`server/src/core/workflows/`) and read-side queries (`server/src/core/queries/`).

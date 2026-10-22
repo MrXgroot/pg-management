@@ -1,39 +1,39 @@
-# Stay Ledger — System Architecture Overview
+# Verified System Architecture
 
-## Executive summary
+## Current architecture (verified)
 
-Stay Ledger is a mobile-first property/PG operations application. It tracks property structure, occupancy, tenant rental terms, rent obligations, payments and allocations, security deposits, and checkout settlements. Its domain is **Properties → Floors → Rooms → Beds → Tenants → Assignments/Rental Terms → Obligations → Payments/Allocations → Deposits/Settlements**. An assignment is the temporal link between tenant and bed; historical assignments are retained. The code suggests property managers/operators as primary users. There is no authentication or role model in this repository.
+```mermaid
+flowchart LR
+  UI[React screens and sheets] --> Hooks[TanStack Query hooks]
+  Hooks --> HTTP[Axios /api/v1]
+  HTTP --> Routes[Express routes]
+  Routes --> Core[Workflows and read queries]
+  Core --> Repos[SQLite repositories]
+  Core --> Policies[Pure date, billing, allocation, deposit rules]
+  Repos --> DB[(better-sqlite3 / SQLite)]
+```
 
-## Stack (verified from manifests/config)
+The client and server are separate npm packages. Vite proxies `/api` to `http://localhost:4000` in development. Server `index.js` reads `PORT` (default 4000), initializes a local SQLite file, starts Express, and closes server/DB on SIGINT/SIGTERM. This is a local development topology; production deployment topology is not described by checked-in deployment manifests.
 
-- Client: React 19, Vite 8, React Router 7, Axios, TanStack Query 5, lucide-react 1.55.
-- Styling: Tailwind CSS 4.3 with `@tailwindcss/vite`; `client/tailwind.config.js` defines custom brand/surface colors, shadows, font, and radius values. `darkMode: "class"` is configured. The root stylesheet should be consulted before changing the Tailwind integration.
-- Server: Node ESM, Express 4, better-sqlite3 11.8; CORS and JSON middleware. API prefix is `/api/v1`.
-- Storage: SQLite schema is initialized from `server/db/schema.sql` when `getDatabase` opens the DB. Foreign keys, WAL, and 5-second busy timeout are enabled. No separate migration framework/version table is present; schema changes currently rely on `CREATE TABLE/INDEX IF NOT EXISTS`.
-- Tests exist under `server/test/` using Vitest; no client test suite is present in the observed tree.
+## Responsibility and dependency boundaries
 
-## Layers and code conventions
+- **Client:** `main.jsx` mounts `app/App`; providers install QueryClient and selected-property context. Screens/layouts compose UI. Data hooks use Axios and query keys. Client `workflows/` are interactive form components, not authoritative domain services.
+- **HTTP layer:** `server/src/app.js` enables CORS and JSON parsing, logs method/path/status/duration, mounts routers, then 404 and error handlers. Routes map HTTP inputs to workflows/queries and wrap success in `{data:...}`.
+- **Server core:** workflows orchestrate mutation use cases; query modules compose read models; repos encapsulate SQL; policies compute dates/allocation/deposit amounts.
+- **Persistence:** `getDatabase` opens `server/db/stay_ledger.db`, enables foreign keys, WAL, `busy_timeout=5000`, and executes schema SQL. The non-memory DB handle is cached as a module singleton.
 
-Server layers are Express routes → core workflows/queries → repositories and policies → SQLite. Workflows wrap multi-row mutations with `db.transaction`; queries build read models. Client layers are route screens → components/sheets/workflow forms → data hooks → Axios API client. `AppProviders` installs QueryClient and property state; `PropertyContext` tracks selected property.
+There is no separate `core/` package shared by client/server. The `server/src/core` directory depends directly on Node-oriented persistence and is not currently Android-portable. Some modules import the DB connection through `../../../../server/db/connection.js`, coupling core paths to the repository layout.
 
-Most JSX files use `.jsx`; pure modules use `.js`, and exports are predominantly named. Exceptions include `client/src/App.jsx`, a placeholder default-export component not used by `main.jsx`/router. Prefer `.jsx` for JSX and `.js` for pure logic; follow existing named-export conventions.
+## Consistency, query, and error behavior
 
-## Five architectural invariants
+Multi-row move-in, payment collection, shift, checkout, and deposit settlement use synchronous better-sqlite3 transactions. Structure delete workflows transact around precondition+delete; structure adds are single repository writes. Query reads are not wrapped in explicit read transactions. QueryClient defaults: two-minute stale time, no refetch on focus, retry once. Axios unwraps `{data}` and normalizes error envelopes.
 
-1. **Keep layers distinct.** Screens render and coordinate; hooks own network/query state; workflows own transactional domain rules; repositories own SQL persistence; policies own reusable calculations.
-2. **Preserve temporal history.** Assignment and rental-term intervals use inclusive `start/effective_from` and exclusive `end_date_exclusive/effective_to_exclusive`. Do not overwrite historical rows to represent moves or term changes.
-3. **Money is integer paise.** SQLite columns and API fields ending `Paise` represent integer paise. UI conversion belongs at the display/input boundary (`formatPaiseToRupees`, `parseRupeesToPaise`). Never persist rounded rupees or mix units.
-4. **Transactions guard multi-row workflows.** A failed workflow must not leave partial tenant/assignment/term/deposit/obligation/payment/settlement state. Preserve the synchronous better-sqlite3 transaction boundary.
-5. **Cache and overlays follow existing contracts.** TanStack keys come from `client/src/api/queryKeys.js`; mutation hooks invalidate affected families. Dashboard detail navigation is implemented with local selected-sheet state and a `BottomSheet`, not a `sheetStack` engine. Do not describe or build a stack unless one is added intentionally.
+Error middleware maps a finite set of error codes to HTTP status; unknown errors become generic 500. There is no authentication or authorization middleware. CORS is unrestricted (`cors()` defaults), and request logging includes URL. These are current security boundaries, not guarantees for deployment.
 
-## Client navigation and data flow
+## Actual conventions and exceptions
 
-`client/src/app/router.jsx` defines `/dashboard`, `/tenants`, `/payments`, `/properties/manage`, `/more`, redirects `/` to dashboard, and renders a not-found screen. `AppLayout` provides the app shell and bottom navigation. Data hooks in `client/src/data/` call the Axios client (base `/api/v1`); server responses use `{data: ...}` and the response interceptor unwraps that envelope. Dashboard opens room/tenant/payment-related overlays through `BottomSheet` and local state. No `sheetStack` identifier was found in `client/src`.
+Production JSX generally uses `.jsx`; pure modules use `.js`; named exports are common. `client/src/App.jsx` is an unused default-export placeholder; actual entry is `main.jsx` → `app/App.jsx`. `DashboardBottomSheet.jsx` has a local stack and synchronously resolves room/bed from `floors`; nested data hooks fetch ledger only when a ledger view is open. Other screens can use their own sheets/selection state. Property selection persists in localStorage and query data is supplied to context.
 
-## Main domain data relationships
+## Intended Android target — not current architecture
 
-Properties own floors; floors own rooms; rooms own beds (beds can be inactive). Tenants belong to one property and have status `ACTIVE` or `CHECKED_OUT`. Assignments connect tenants to beds across date intervals. A tenant can have rental terms and obligations over time. Payments belong to tenants and allocate against obligations; unallocated payment value is represented as advance credit in read models. Deposits belong to tenants and can be settled once, with deductions and refund/liability totals.
-
-## Operational caveats
-
-There is no authentication/authorization, server-side schema validation framework, formal migration runner, or API version negotiation visible in this codebase. Treat those as current scope gaps, not implicit guarantees. The database defaults to `server/db/stay_ledger.db`; avoid committing generated runtime data.
+The stated target is Android as primary app, with business core running locally and directly managing a local DB, without the current server/API runtime. Migration boundary is not yet decided. See [Android plan](06_ANDROID_MIGRATION.md) for portability gaps and open choices. Do not imply current server core is already shared or that the target storage/framework has been selected.

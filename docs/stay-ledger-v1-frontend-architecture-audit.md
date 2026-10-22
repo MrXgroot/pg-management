@@ -1,3 +1,5 @@
+# Historical snapshot — superseded by [docs/README.md](README.md), especially [architecture](context/01_SYSTEM_ARCHITECTURE_OVERVIEW.md), [frontend/testing](context/04_FRONTEND_AND_TESTING_REFERENCE.md), and [audit findings](context/05_AUDIT_FINDINGS.md). Kept for history.
+
 # Stay Ledger V1 Frontend — Architecture Audit & State Baseline
 
 **Audit Date:** October 12, 2026  

@@ -1,35 +1,39 @@
-# Stay Ledger — AI Handoff Primer
+# Stay Ledger — Project Context Primer
 
-You are working on Stay Ledger, a mobile-first property/PG management application. Operators manage properties and their floors, rooms, beds, occupants, rental terms, rent obligations, payments, deposits, and checkout settlements. The domain is **Properties → Floors → Rooms → Beds → Tenants → Assignments/Rental Terms → Obligations → Payments/Allocations → Settlements**.
+Stay Ledger is a property/PG operations app for managing property structure and occupancy, tenant lifecycle, rent obligations and collection, deposits, and ledger history. This document is an orientation map; inspect source before relying on a behavior claim.
 
-## Stack and layout
+## Verified current stack
 
-Client: React 19, Vite 8, React Router 7, Tailwind CSS 4, TanStack Query 5, Axios, lucide-react. Server: Node ESM, Express 4, better-sqlite3. SQLite schema is `server/db/schema.sql`; startup uses `CREATE TABLE/INDEX IF NOT EXISTS`, not a versioned migration framework. API base path is `/api/v1`; success responses use `{data: ...}`.
+- Client: React 19, Vite 8, React Router 7, Tailwind CSS 4, TanStack Query 5, Axios, lucide-react.
+- Server: Node.js ES modules, Express 4, better-sqlite3 11.8; API prefix `/api/v1`.
+- Database: SQLite initialized through `server/db/connection.js` and `server/db/schema.sql`; no versioned migrations found.
+- Android is an intended future standalone runtime, not current implementation. No Android project/framework is present.
 
-Server flow: routes → `server/src/core/workflows` or `queries` → repositories/policies → SQLite. Client flow: route screens → components/workflow sheets → hooks in `client/src/data` → Axios. Query keys are centralized at `client/src/api/queryKeys.js`. Routes are `/dashboard`, `/tenants`, `/payments`, `/properties/manage`, `/more`; `/` redirects to `/dashboard`.
+## Repository map
 
-## Five golden invariants — never break these
+- `client/src/app/`: app composition, providers, router.
+- `client/src/screens/`, `layouts/`, `components/`, `workflows/`: screen and UI workflow code.
+- `client/src/data/`, `api/`, `context/`: TanStack Query hooks, API client, selected-property state.
+- `server/src/routes/`: HTTP route adapters.
+- `server/src/core/workflows/`, `queries/`, `repos/`, `policies/`: server-side business operations, read models, SQL access, calculations.
+- `server/db/`: SQLite schema, connection, seed.
+- `server/test/`: Vitest repository, query, workflow, and DB integration coverage.
+- `docs/README.md`: authoritative document index.
 
-1. Keep screens, hooks, workflows, repositories, and policies in their existing layers; do not put SQL in UI or business transactions in components.
-2. Preserve history and temporal boundaries. Assignment and rental-term ends are exclusive; represent shifts/checkouts with closed historical intervals and new rows.
-3. Store and exchange money as integer paise. Only format/parse at UI boundaries with `formatPaiseToRupees` and `parseRupeesToPaise`.
-4. Keep multi-row domain mutations atomic in better-sqlite3 transactions. A thrown workflow error must roll back the complete operation.
-5. Use centralized query keys and invalidate every affected read model after mutations. Existing dashboard overlays use local single-sheet state; there is no `sheetStack` implementation today.
+## Golden verified invariants
 
-## Current route status (source-level)
+1. Money is stored and exchanged in integer paise (`*_paise`/`*Paise`); client formats at UI boundary via `formatPaiseToRupees`.
+2. Assignment and rental-term intervals use exclusive end dates in SQL predicates and workflows; adjacent intervals can meet at a boundary.
+3. Core multi-write workflows use better-sqlite3 transactions.
+4. Frontend reads are TanStack Query hooks; keys are centralized in `client/src/api/queryKeys.js`, although some invalidation uses literal prefixes.
+5. Dashboard overlay navigation uses a local `sheetStack` in `DashboardBottomSheet`; this is UI state over cached occupancy data, not server-side routing.
 
-- `/dashboard`: implemented occupancy/property overview with floor/room/bed views and bottom-sheet tenant actions/ledger flows.
-- `/tenants`: implemented tenant directory with search/filter/list and tenant action pathways.
-- `/payments`: implemented active collection queue, balance prioritization, filters, and collection sheet; continue UX and error-state validation rather than assuming it is analytics-only.
-- `/properties/manage`: implemented property/structure management surfaces and add-floor/room/bed UI. Validate completeness, persistence feedback, and destructive/error cases.
-- `/more`: implemented property details, policy settings, export, and system information cards. Verify which settings are persisted and complete missing behavior.
+## Current implementation status
 
-These are implementation-presence statements, not certification of release readiness. The source audit found no authentication layer, schema migration versioning, or sheet stack.
+The router declares `/dashboard`, `/tenants`, `/payments`, `/properties/manage`, `/more`. Dashboard presents occupancy and stacked bottom-sheet actions; tenants provides directory/filtering; payments has collection queue and collection sheet; manage has property/structure screens; more has settings/export/info cards. These statements indicate code presence only; see the frontend reference for incomplete or mismatched behavior.
 
-## Known concerns to verify/address
+## Sources and AI use
 
-Property occupancy financial totals mix current-cycle matching with all outstanding obligations; financial summary mostly reports all-time totals. Move-in does not verify that the selected bed belongs to the submitted property. Assignment overlap is checked in workflows but is not enforced by a DB exclusion constraint. Collection does not reject checked-out tenants and idempotency key reuse is not compared to the retry payload. Query dates need consistent validation/timezone semantics. Allocation aggregate caps are not DB-enforced. Seed data lacks true unallocated advance credit, multi-shift history, and several deposit edge cases. See `03_CODEBASE_AUDIT_AND_FLAWS.md` for details.
+Schema and connection are authoritative for persistence; route files for HTTP; workflows/policies for business rules; client hooks and screens for UI behavior; tests establish only their covered assertions. Package manifests establish declared versions/scripts. GitHub snapshots and old documents may differ from the local working tree: state which revision/tree was inspected, and never claim to have seen local uncommitted changes unless explicitly provided. Code/schema/tests take precedence over stale AI-generated documentation.
 
-## How to handle future tasks
-
-First inspect the relevant existing files and repository instructions; state assumptions briefly. Follow the current API and schema contracts, and update documentation only when implementation changes warrant it. Do not invent paths or report unverified defects as facts. For money, use paise end-to-end; for dates, preserve canonical ISO text and exclusive end semantics. Keep changes scoped, explain behavior and risks, and run verification only when requested or necessary to establish correctness. Ask for a business-rule decision only when the implementation cannot safely infer it from existing behavior. Remember this primer is a handoff summary; inspect source before making changes.
+Read [architecture](01_SYSTEM_ARCHITECTURE_OVERVIEW.md), [domain and API](02_API_AND_DATA_CONTRACTS.md), [persistence and core](03_DATABASE_AND_CORE_REFERENCE.md), [frontend and tests](04_FRONTEND_AND_TESTING_REFERENCE.md), [audit findings](05_AUDIT_FINDINGS.md), [Android plan](06_ANDROID_MIGRATION.md), and [AI collaboration/handoff](07_AI_COLLABORATION_AND_HANDOFF.md). Do not start Android migration as part of an audit or planning task.

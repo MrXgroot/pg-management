@@ -1,3 +1,5 @@
+# Historical snapshot — superseded by [docs/README.md](README.md), [domain/API contract](context/02_API_AND_DATA_CONTRACTS.md), and [persistence/core reference](context/03_DATABASE_AND_CORE_REFERENCE.md). Kept for history; source code is authoritative.
+
 # Implemented Workflows and Queries Contract — Stay Ledger V1
 
 Authoritative snapshot contract for the read queries and transactional write workflows in `Stay Ledger V1`. This specification defines the exact signatures, payload shapes, return structures, and domain error codes used by the Express transport layer (`src/routes/`, `src/middleware/errorHandler.js`) and client query hooks.
