@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createTestDb } from "../helpers/testDb.js";
 import { moveOutWorkflow } from "../../src/core/workflows/moveOutWorkflow.js";
+import * as tenantRepo from "../../src/core/repos/tenantRepo.js";
 
 describe("moveOutWorkflow", () => {
   let db;
@@ -45,6 +46,11 @@ describe("moveOutWorkflow", () => {
     ).run(tenantId);
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+    db?.close();
+  });
+
   it("closes assignment at checkoutDate, marks tenant CHECKED_OUT, and frees the bed", () => {
     const result = moveOutWorkflow(
       {
@@ -85,5 +91,34 @@ describe("moveOutWorkflow", () => {
         db,
       );
     }).toThrow("TENANT_ALREADY_CHECKED_OUT");
+  });
+
+  it("characterizes checkout on assignment start as a zero-length interval", () => {
+    const result = moveOutWorkflow({ tenantId, checkoutDate: "2026-01-01" }, db);
+
+    expect(result.closedAssignment.startDate).toBe("2026-01-01");
+    expect(result.closedAssignment.endDateExclusive).toBe("2026-01-01");
+    expect(result.tenant.status).toBe("CHECKED_OUT");
+    expect(db.prepare("SELECT effective_from, effective_to_exclusive FROM rental_terms WHERE id = 'term-1'").get()).toEqual({
+      effective_from: "2026-01-01",
+      effective_to_exclusive: "2026-01-01",
+    });
+    // Whether same-day move-in and checkout is valid is a product decision not settled here.
+  });
+
+  it("rolls back assignment and term closure when tenant status persistence fails", () => {
+    vi.spyOn(tenantRepo, "updateStatus").mockImplementationOnce(() => {
+      throw new Error("SIMULATED_TENANT_WRITE_FAILURE");
+    });
+
+    expect(() => moveOutWorkflow({ tenantId, checkoutDate: "2026-03-31" }, db)).toThrow("SIMULATED_TENANT_WRITE_FAILURE");
+
+    const assignment = db.prepare("SELECT * FROM assignments WHERE id = 'assign-1'").get();
+    const term = db.prepare("SELECT * FROM rental_terms WHERE id = 'term-1'").get();
+    const tenant = db.prepare("SELECT * FROM tenants WHERE id = ?").get(tenantId);
+    expect(assignment.end_date_exclusive).toBeNull();
+    expect(term.effective_to_exclusive).toBeNull();
+    expect(tenant.status).toBe("ACTIVE");
+    expect(tenant.checkout_date).toBeNull();
   });
 });

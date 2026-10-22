@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createTestDb } from "../helpers/testDb.js";
 import { collectPaymentWorkflow } from "../../src/core/workflows/collectPaymentWorkflow.js";
+import * as paymentAllocationRepo from "../../src/core/repos/paymentAllocationRepo.js";
 
 describe("collectPaymentWorkflow", () => {
   let db;
@@ -27,6 +28,11 @@ describe("collectPaymentWorkflow", () => {
     ).run(termId, tenantId);
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+    db?.close();
+  });
+
   it("settles a single obligation completely when exact payment is received", () => {
     db.prepare(
       `
@@ -51,6 +57,20 @@ describe("collectPaymentWorkflow", () => {
     expect(result.allocations[0].amountPaise).toBe(1000000);
     expect(result.unallocatedPaise).toBe(0);
     expect(result.isDuplicate).toBe(false);
+
+    const persistedPayment = db.prepare("SELECT * FROM payments WHERE id = ?").get(result.payment.id);
+    const persistedAllocation = db.prepare("SELECT * FROM payment_allocations WHERE payment_id = ?").get(result.payment.id);
+    const obligationBalance = db.prepare(`
+      SELECT o.amount_paise - COALESCE(SUM(pa.amount_paise), 0) AS remaining_paise
+      FROM obligations o
+      LEFT JOIN payment_allocations pa ON pa.obligation_id = o.id
+      WHERE o.id = 'ob-1'
+      GROUP BY o.id
+    `).get();
+    expect(persistedPayment.amount_paise).toBe(1000000);
+    expect(persistedAllocation.obligation_id).toBe("ob-1");
+    expect(persistedAllocation.amount_paise).toBe(persistedPayment.amount_paise);
+    expect(obligationBalance.remaining_paise).toBe(0);
   });
 
   it("leaves obligation partially paid when a partial payment is collected", () => {
@@ -132,6 +152,14 @@ describe("collectPaymentWorkflow", () => {
     expect(result.allocations[1].obligationId).toBe("ob-2");
     expect(result.allocations[1].amountPaise).toBe(600000);
     expect(result.unallocatedPaise).toBe(0);
+    const obligationAllocationTotals = db.prepare(`
+      SELECT o.id, o.amount_paise, COALESCE(SUM(pa.amount_paise), 0) AS allocated_paise
+      FROM obligations o
+      LEFT JOIN payment_allocations pa ON pa.obligation_id = o.id
+      WHERE o.tenant_id = ?
+      GROUP BY o.id
+    `).all(tenantId);
+    expect(obligationAllocationTotals.every((row) => row.allocated_paise <= row.amount_paise)).toBe(true);
   });
 
   it("returns the existing payment with isDuplicate: true without duplicate writes when idempotencyKey is repeated", () => {
@@ -202,5 +230,64 @@ describe("collectPaymentWorkflow", () => {
     expect(updatedObligation.due_date).toBe("2026-01-15");
     expect(updatedObligation.period_start).toBe("2026-01-01");
     expect(updatedObligation.period_end_exclusive).toBe("2026-02-01");
+  });
+
+  it.each([
+    ["zero amount", 0, "2026-01-05", "INVALID_PAYMENT_AMOUNT"],
+    ["negative amount", -1, "2026-01-05", "INVALID_PAYMENT_AMOUNT"],
+    ["fractional paise", 1.5, "2026-01-05", "INVALID_PAYMENT_AMOUNT"],
+    ["invalid calendar date", 100, "2026-02-30", /Invalid calendar date/],
+  ])("rejects %s without persisting a payment", (_label, amountPaise, paidOn, error) => {
+    expect(() => collectPaymentWorkflow({
+      tenantId,
+      amountPaise,
+      paidOn,
+      paymentMethod: "UPI",
+    }, db)).toThrow(error);
+
+    expect(db.prepare("SELECT COUNT(*) AS count FROM payments").get().count).toBe(0);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM payment_allocations").get().count).toBe(0);
+  });
+
+  it.each([
+    ["different tenant", { tenantId: "different-tenant" }],
+    ["different amount", { amountPaise: 900000 }],
+    ["different date", { paidOn: "2026-01-06" }],
+    ["different method", { paymentMethod: "CASH" }],
+  ])("characterizes current idempotency behavior when the retry has a %s", (_label, changes) => {
+    db.prepare("INSERT INTO obligations (id, tenant_id, period_start, period_end_exclusive, due_date, amount_paise, rental_term_id) VALUES ('ob-idem', ?, '2026-01-01', '2026-02-01', '2026-01-05', 1000000, ?)").run(tenantId, termId);
+    const initial = {
+      tenantId,
+      amountPaise: 1000000,
+      paidOn: "2026-01-05",
+      paymentMethod: "UPI",
+      idempotencyKey: "same-key",
+    };
+    const first = collectPaymentWorkflow(initial, db);
+    const retry = collectPaymentWorkflow({ ...initial, ...changes }, db);
+
+    // Current behavior returns the original record without comparing request fields.
+    expect(retry.isDuplicate).toBe(true);
+    expect(retry.payment.id).toBe(first.payment.id);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM payments WHERE idempotency_key = 'same-key'").get().count).toBe(1);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM payment_allocations").get().count).toBe(1);
+  });
+
+  it("rolls back the inserted payment when allocation persistence fails", () => {
+    db.prepare("INSERT INTO obligations (id, tenant_id, period_start, period_end_exclusive, due_date, amount_paise, rental_term_id) VALUES ('ob-fail', ?, '2026-01-01', '2026-02-01', '2026-01-05', 1000000, ?)").run(tenantId, termId);
+    vi.spyOn(paymentAllocationRepo, "insertMany").mockImplementationOnce(() => {
+      throw new Error("SIMULATED_ALLOCATION_WRITE_FAILURE");
+    });
+
+    expect(() => collectPaymentWorkflow({
+      tenantId,
+      amountPaise: 700000,
+      paidOn: "2026-01-05",
+      paymentMethod: "UPI",
+    }, db)).toThrow("SIMULATED_ALLOCATION_WRITE_FAILURE");
+
+    expect(db.prepare("SELECT COUNT(*) AS count FROM payments").get().count).toBe(0);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM payment_allocations").get().count).toBe(0);
+    expect(db.prepare("SELECT COALESCE(SUM(amount_paise), 0) AS allocated FROM payment_allocations WHERE obligation_id = 'ob-fail'").get().allocated).toBe(0);
   });
 });

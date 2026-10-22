@@ -1,14 +1,13 @@
 // server/test/db_integration.test.js
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { getDatabase, initSchema } from "../../db/connection.js";
 import { seedDatabase } from "../../db/seed.js";
+import { createTestDb } from "../helpers/testDb.js";
 describe("Database Schema & Integrity Integration Tests", () => {
   let db;
 
   beforeEach(() => {
     // Brand new isolated in-memory DB for every single test
-    db = getDatabase(":memory:");
-    initSchema(db);
+    db = createTestDb();
     seedDatabase(db);
   });
 
@@ -25,7 +24,8 @@ describe("Database Schema & Integrity Integration Tests", () => {
     expect(prop.name).toBe("Greenview Luxury PG");
 
     const beds = db.prepare("SELECT * FROM beds").all();
-    expect(beds).toHaveLength(2);
+    expect(beds).toHaveLength(12);
+    expect(beds.filter((bed) => bed.is_active === 0)).toHaveLength(1);
 
     const tenant = db
       .prepare("SELECT * FROM tenants WHERE id = ?")
@@ -45,7 +45,7 @@ describe("Database Schema & Integrity Integration Tests", () => {
     }).toThrow(/FOREIGN KEY constraint failed/);
   });
 
-  it("enforces UNIQUE constraints on duplicate tenant intervals", () => {
+  it("enforces UNIQUE constraints on duplicate tenant obligation periods", () => {
     expect(() => {
       db.prepare(
         `
@@ -78,7 +78,7 @@ describe("Database Schema & Integrity Integration Tests", () => {
     }).toThrow(/UNIQUE constraint failed/);
   });
 
-  it("enforces positive integer amounts in paise", () => {
+  it("enforces positive amount checks for integer paise fields", () => {
     expect(() => {
       db.prepare(
         `
@@ -87,5 +87,18 @@ describe("Database Schema & Integrity Integration Tests", () => {
       `,
       ).run();
     }).toThrow(/CHECK constraint failed/);
+  });
+
+  it("enforces foreign keys and required property fields", () => {
+    expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
+    expect(() => db.prepare("INSERT INTO properties (id, name, address) VALUES ('missing-name', NULL, 'Address')").run()).toThrow(/NOT NULL constraint failed/);
+    expect(() => db.prepare("INSERT INTO floors (id, property_id, display_order, name) VALUES ('bad-floor', 'absent-property', 1, 'Floor')").run()).toThrow(/FOREIGN KEY constraint failed/);
+  });
+
+  it("rejects negative obligation amounts", () => {
+    expect(() => db.prepare(`
+      INSERT INTO obligations (id, tenant_id, period_start, period_end_exclusive, due_date, amount_paise)
+      VALUES ('oblg_negative', 'ten_1', '2026-11-01', '2026-12-01', '2026-11-05', -1)
+    `).run()).toThrow(/CHECK constraint failed/);
   });
 });
