@@ -29,6 +29,28 @@ propertyRouter.post("/properties", async (req, res, next) => {
   }
 });
 
+propertyRouter.patch("/properties/:id", async (req, res, next) => {
+  try {
+    const { name, address } = req.body;
+
+    const existingProperty = await propertyRepo.findById(req.params.id);
+    if (!existingProperty) {
+      const error = new Error(`Property with id ${req.params.id} not found.`);
+      error.code = "PROPERTY_NOT_FOUND";
+      return next(error);
+    }
+
+    const updatedProperty = await propertyRepo.update(req.params.id, {
+      name,
+      address,
+    });
+
+    return res.status(200).json({ data: updatedProperty });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 propertyRouter.get("/properties/:id/occupancy", async (req, res, next) => {
   try {
     const tree = await occupancyQueries.getPropertyOccupancyTree(
