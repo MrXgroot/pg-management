@@ -22,8 +22,10 @@ export function collectPaymentWorkflow(
   db = getDatabase(),
 ) {
   assertValidDate(paidOn, "paidOn");
-  if (nextDueDateOverride)
+
+  if (nextDueDateOverride) {
     assertValidDate(nextDueDateOverride, "nextDueDateOverride");
+  }
 
   if (!Number.isInteger(amountPaise) || amountPaise <= 0) {
     throw new Error("INVALID_PAYMENT_AMOUNT");
@@ -35,15 +37,29 @@ export function collectPaymentWorkflow(
         idempotencyKey,
         db,
       );
+
       if (existingPayment) {
+        const hasConflictingPayload =
+          existingPayment.tenantId !== tenantId ||
+          existingPayment.amountPaise !== amountPaise ||
+          existingPayment.paidOn !== paidOn ||
+          existingPayment.paymentMethod !== paymentMethod ||
+          (existingPayment.referenceNote ?? null) !== referenceNote;
+
+        if (hasConflictingPayload) {
+          throw new Error("IDEMPOTENCY_KEY_CONFLICT");
+        }
+
         const allocations = paymentAllocationRepo.findByPaymentId(
           existingPayment.id,
           db,
         );
+
         const allocatedPaise = allocations.reduce(
-          (sum, a) => sum + a.amountPaise,
+          (sum, allocation) => sum + allocation.amountPaise,
           0,
         );
+
         return {
           payment: existingPayment,
           allocations,
@@ -54,25 +70,32 @@ export function collectPaymentWorkflow(
     }
 
     const tenant = tenantRepo.findById(tenantId, db);
+
     if (!tenant) {
       throw new Error("TENANT_NOT_FOUND");
     }
 
     const terms = rentalTermRepo.findByTenantId(tenantId, db);
+
     if (terms.length > 0) {
       let latestObligation = obligationRepo.findLatestBoundaryByTenantId(
         tenantId,
         db,
       );
+
       if (latestObligation) {
         const anchorDay = parseInt(tenant.joiningDate.slice(8, 10), 10);
+
         while (latestObligation.periodEndExclusive <= paidOn) {
           const nextPeriod = computeNextBillingPeriod({
             currentPeriodStart: latestObligation.periodEndExclusive,
             anchorDay,
             checkoutDate: tenant.checkoutDate,
           });
-          if (!nextPeriod) break;
+
+          if (!nextPeriod) {
+            break;
+          }
 
           const activeTerm =
             rentalTermRepo.findActiveByTenantId(
@@ -80,6 +103,7 @@ export function collectPaymentWorkflow(
               nextPeriod.periodStart,
               db,
             ) || terms[terms.length - 1];
+
           latestObligation = obligationRepo.insertIfPeriodMissing(
             {
               id: crypto.randomUUID(),
@@ -101,6 +125,7 @@ export function collectPaymentWorkflow(
         tenantId,
         db,
       );
+
       if (outstanding.length > 0) {
         obligationRepo.updateDueDate(
           outstanding[0].id,
@@ -114,10 +139,12 @@ export function collectPaymentWorkflow(
       tenantId,
       db,
     );
+
     const { allocations: computedAllocations, unallocatedPaise } =
       allocatePayment(amountPaise, outstandingObligations);
 
     const paymentId = crypto.randomUUID();
+
     const payment = paymentRepo.insert(
       {
         id: paymentId,
@@ -131,11 +158,11 @@ export function collectPaymentWorkflow(
       db,
     );
 
-    const allocationRecords = computedAllocations.map((a) => ({
+    const allocationRecords = computedAllocations.map((allocation) => ({
       id: crypto.randomUUID(),
       paymentId: payment.id,
-      obligationId: a.obligationId,
-      amountPaise: a.amountPaise,
+      obligationId: allocation.obligationId,
+      amountPaise: allocation.amountPaise,
     }));
 
     if (allocationRecords.length > 0) {
