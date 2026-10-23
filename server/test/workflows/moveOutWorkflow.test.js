@@ -93,17 +93,27 @@ describe("moveOutWorkflow", () => {
     }).toThrow("TENANT_ALREADY_CHECKED_OUT");
   });
 
-  it("characterizes checkout on assignment start as a zero-length interval", () => {
-    const result = moveOutWorkflow({ tenantId, checkoutDate: "2026-01-01" }, db);
+  it("rejects same-day checkout without changing tenant, assignment, or rental term", () => {
+    const assignmentBefore = db
+      .prepare("SELECT * FROM assignments WHERE id = 'assign-1'")
+      .get();
+    const tenantBefore = db
+      .prepare("SELECT * FROM tenants WHERE id = ?")
+      .get(tenantId);
+    const termBefore = db
+      .prepare("SELECT * FROM rental_terms WHERE id = 'term-1'")
+      .get();
 
-    expect(result.closedAssignment.startDate).toBe("2026-01-01");
-    expect(result.closedAssignment.endDateExclusive).toBe("2026-01-01");
-    expect(result.tenant.status).toBe("CHECKED_OUT");
-    expect(db.prepare("SELECT effective_from, effective_to_exclusive FROM rental_terms WHERE id = 'term-1'").get()).toEqual({
-      effective_from: "2026-01-01",
-      effective_to_exclusive: "2026-01-01",
-    });
-    // Whether same-day move-in and checkout is valid is a product decision not settled here.
+    expect(() =>
+      moveOutWorkflow({ tenantId, checkoutDate: "2026-01-01" }, db),
+    ).toThrow("CHECKOUT_DATE_MUST_BE_AFTER_START_DATE");
+
+    expect(db.prepare("SELECT * FROM assignments WHERE id = 'assign-1'").get())
+      .toEqual(assignmentBefore);
+    expect(db.prepare("SELECT * FROM tenants WHERE id = ?").get(tenantId))
+      .toEqual(tenantBefore);
+    expect(db.prepare("SELECT * FROM rental_terms WHERE id = 'term-1'").get())
+      .toEqual(termBefore);
   });
 
   it("rolls back assignment and term closure when tenant status persistence fails", () => {

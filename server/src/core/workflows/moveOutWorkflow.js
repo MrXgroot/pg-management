@@ -24,8 +24,8 @@ export function moveOutWorkflow(
       throw new Error("NO_ACTIVE_ASSIGNMENT");
     }
 
-    if (checkoutDate < activeAssignment.startDate) {
-      throw new Error("CHECKOUT_DATE_BEFORE_START_DATE");
+    if (checkoutDate <= activeAssignment.startDate) {
+      throw new Error("CHECKOUT_DATE_MUST_BE_AFTER_START_DATE");
     }
 
     const closedAssignment = assignmentRepo.close(

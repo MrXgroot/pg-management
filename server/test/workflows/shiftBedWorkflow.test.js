@@ -126,17 +126,30 @@ describe("shiftBedWorkflow", () => {
     }, db)).toThrow("TENANT_NOT_ACTIVE");
   });
 
-  it("characterizes a same-start-date shift as a zero-length historical interval", () => {
-    const result = shiftBedWorkflow({
-      tenantId,
-      targetBedId,
-      shiftDate: "2026-01-01",
-    }, db);
+  it("rejects a same-day bed shift without changing assignment history", () => {
+    const assignmentHistoryBefore = db
+      .prepare(
+        "SELECT * FROM assignments WHERE bed_id IN (?, ?) ORDER BY id",
+      )
+      .all(currentBedId, targetBedId);
 
-    expect(result.closedAssignment.startDate).toBe("2026-01-01");
-    expect(result.closedAssignment.endDateExclusive).toBe("2026-01-01");
-    expect(result.newAssignment.startDate).toBe("2026-01-01");
-    // Product meaning for a same-day transfer is unresolved; this records current behavior only.
+    expect(() =>
+      shiftBedWorkflow({
+        tenantId,
+        targetBedId,
+        shiftDate: "2026-01-01",
+      }, db),
+    ).toThrow("SHIFT_DATE_BEFORE_START_DATE");
+
+    const assignmentHistoryAfter = db
+      .prepare(
+        "SELECT * FROM assignments WHERE bed_id IN (?, ?) ORDER BY id",
+      )
+      .all(currentBedId, targetBedId);
+    expect(assignmentHistoryAfter).toEqual(assignmentHistoryBefore);
+    expect(assignmentHistoryAfter).toHaveLength(1);
+    expect(assignmentHistoryAfter[0].bed_id).toBe(currentBedId);
+    expect(assignmentHistoryAfter[0].end_date_exclusive).toBeNull();
   });
 
   it("rolls back closing the current assignment when inserting the new assignment fails", () => {

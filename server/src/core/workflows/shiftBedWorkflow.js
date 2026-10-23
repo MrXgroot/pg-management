@@ -29,7 +29,7 @@ export function shiftBedWorkflow(
       throw new Error("CANNOT_SHIFT_TO_SAME_BED");
     }
 
-    if (shiftDate < currentAssignment.startDate) {
+    if (shiftDate <= currentAssignment.startDate) {
       throw new Error("SHIFT_DATE_BEFORE_START_DATE");
     }
 
