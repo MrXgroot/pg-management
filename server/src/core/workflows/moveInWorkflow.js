@@ -29,22 +29,43 @@ export function moveInWorkflow(
   if (!Number.isInteger(rentPaise) || rentPaise <= 0) {
     throw new Error("INVALID_RENT_AMOUNT");
   }
+
   if (!Number.isInteger(depositPaise) || depositPaise < 0) {
     throw new Error("INVALID_DEPOSIT_AMOUNT");
   }
 
   const run = db.transaction(() => {
     const property = propertyRepo.findById(propertyId, db);
+
     if (!property) {
       throw new Error("PROPERTY_NOT_FOUND");
     }
 
     const bed = bedRepo.findById(bedId, db);
+
     if (!bed) {
       throw new Error("BED_NOT_FOUND");
     }
+
     if (!bed.isActive) {
       throw new Error("BED_INACTIVE");
+    }
+
+    // Verify that the bed belongs to the requested property.
+    const bedProperty = db
+      .prepare(
+        `
+        SELECT f.property_id AS propertyId
+        FROM beds b
+        JOIN rooms r ON r.id = b.room_id
+        JOIN floors f ON f.id = r.floor_id
+        WHERE b.id = ?
+        `,
+      )
+      .get(bedId);
+
+    if (!bedProperty || bedProperty.propertyId !== propertyId) {
+      throw new Error("BED_PROPERTY_MISMATCH");
     }
 
     const overlaps = assignmentRepo.findOverlapsForBed(
@@ -61,6 +82,7 @@ export function moveInWorkflow(
     }
 
     const tenantId = crypto.randomUUID();
+
     const tenant = tenantRepo.insert(
       {
         id: tenantId,
@@ -74,6 +96,7 @@ export function moveInWorkflow(
     );
 
     const assignmentId = crypto.randomUUID();
+
     const assignment = assignmentRepo.insert(
       {
         id: assignmentId,
@@ -86,6 +109,7 @@ export function moveInWorkflow(
     );
 
     const rentalTermId = crypto.randomUUID();
+
     const rentalTerm = rentalTermRepo.insert(
       {
         id: rentalTermId,
@@ -98,6 +122,7 @@ export function moveInWorkflow(
     );
 
     let deposit = null;
+
     if (depositPaise > 0) {
       deposit = depositRepo.insert(
         {
@@ -112,12 +137,14 @@ export function moveInWorkflow(
     }
 
     const anchorDay = parseInt(joiningDate.slice(8, 10), 10);
+
     const period = computeNextBillingPeriod({
       currentPeriodStart: joiningDate,
       anchorDay,
     });
 
     const obligationId = crypto.randomUUID();
+
     const obligation = obligationRepo.insert(
       {
         id: obligationId,
