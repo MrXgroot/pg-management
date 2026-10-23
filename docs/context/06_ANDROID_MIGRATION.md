@@ -22,11 +22,11 @@ Current dependencies/barriers: workflow modules use `node:crypto`; query/workflo
 - **Risk/rollback:** none to runtime; preserve current implementation as reference.
 - **Tests:** run and record existing server suite; add missing behavior tests before extraction.
 
-### Stage 1 — Close integrity and contract gaps
+### Stage 1 — Close remaining integrity and contract gaps
 
 - **Objective:** Stabilize property ownership, assignment intervals, payment idempotency, financial scopes, and API/client mismatches before parity baseline.
 - **Code:** A-01 through A-07; `server/src/core`, routes, tests, client hooks.
-- **Prerequisites:** product decisions for A-05/A-06/open questions.
+- **Prerequisites:** A-05 same-day interval semantics are decided and workflow-tested; schema-level interval enforcement and concurrency remain open. A-03/A-06 product rules and other listed open questions need explicit decisions before financial changes.
 - **Deliverables:** validated rule decisions, regression cases, clarified contracts. Implementation requires a separate task authorization.
 - **Acceptance:** consistent historical ledger and occupancy under boundary, duplicate, retry, and property-isolation cases.
 - **Risk/rollback:** schema/data migrations could invalidate existing DB; snapshot and migration rollback plan needed before schema changes.

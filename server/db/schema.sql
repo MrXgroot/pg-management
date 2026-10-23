@@ -44,6 +44,70 @@ CREATE TABLE IF NOT EXISTS assignments (
   end_date_exclusive TEXT
 );
 
+CREATE TRIGGER IF NOT EXISTS assignments_integrity_before_insert
+BEFORE INSERT ON assignments
+FOR EACH ROW
+BEGIN
+  SELECT CASE
+    WHEN NEW.end_date_exclusive IS NOT NULL
+      AND NEW.start_date >= NEW.end_date_exclusive
+    THEN RAISE(ABORT, 'ASSIGNMENT_INTERVAL_INVALID')
+  END;
+
+  SELECT CASE
+    WHEN EXISTS (
+      SELECT 1 FROM assignments existing
+      WHERE existing.bed_id = NEW.bed_id
+        AND (existing.end_date_exclusive IS NULL OR NEW.start_date < existing.end_date_exclusive)
+        AND (NEW.end_date_exclusive IS NULL OR existing.start_date < NEW.end_date_exclusive)
+    )
+    THEN RAISE(ABORT, 'ASSIGNMENT_BED_OVERLAP')
+  END;
+
+  SELECT CASE
+    WHEN EXISTS (
+      SELECT 1 FROM assignments existing
+      WHERE existing.tenant_id = NEW.tenant_id
+        AND (existing.end_date_exclusive IS NULL OR NEW.start_date < existing.end_date_exclusive)
+        AND (NEW.end_date_exclusive IS NULL OR existing.start_date < NEW.end_date_exclusive)
+    )
+    THEN RAISE(ABORT, 'ASSIGNMENT_TENANT_OVERLAP')
+  END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS assignments_integrity_before_update
+BEFORE UPDATE OF tenant_id, bed_id, start_date, end_date_exclusive ON assignments
+FOR EACH ROW
+BEGIN
+  SELECT CASE
+    WHEN NEW.end_date_exclusive IS NOT NULL
+      AND NEW.start_date >= NEW.end_date_exclusive
+    THEN RAISE(ABORT, 'ASSIGNMENT_INTERVAL_INVALID')
+  END;
+
+  SELECT CASE
+    WHEN EXISTS (
+      SELECT 1 FROM assignments existing
+      WHERE existing.id <> OLD.id
+        AND existing.bed_id = NEW.bed_id
+        AND (existing.end_date_exclusive IS NULL OR NEW.start_date < existing.end_date_exclusive)
+        AND (NEW.end_date_exclusive IS NULL OR existing.start_date < NEW.end_date_exclusive)
+    )
+    THEN RAISE(ABORT, 'ASSIGNMENT_BED_OVERLAP')
+  END;
+
+  SELECT CASE
+    WHEN EXISTS (
+      SELECT 1 FROM assignments existing
+      WHERE existing.id <> OLD.id
+        AND existing.tenant_id = NEW.tenant_id
+        AND (existing.end_date_exclusive IS NULL OR NEW.start_date < existing.end_date_exclusive)
+        AND (NEW.end_date_exclusive IS NULL OR existing.start_date < NEW.end_date_exclusive)
+    )
+    THEN RAISE(ABORT, 'ASSIGNMENT_TENANT_OVERLAP')
+  END;
+END;
+
 CREATE TABLE IF NOT EXISTS rental_terms (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,

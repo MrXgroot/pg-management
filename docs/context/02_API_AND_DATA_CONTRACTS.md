@@ -1,64 +1,67 @@
-# Domain Rules and HTTP Contracts
+# Historical domain rules and temporary HTTP contracts
 
-Evidence: `server/db/schema.sql`, `server/src/core/{workflows,queries,policies}`, route handlers, client API/hooks, and current tests. Rules below are verified only to the extent named; unresolved semantics are called out.
+> This context reference is retained for audit history. For current authoritative contracts, use [business rules](../business_rules_and_policies.md), [database schema](../database_schema.md), [workflows](../workflows_and_queries.md), and [API transport](../API_TRANSPORT_CONTRACT.md). Later A-05 work added SQLite assignment triggers; any conflicting pre-trigger statement below is superseded by the current schema reference.
 
-## Domain and lifecycle
+This document separates observed implementation from unresolved product intent. Current sources are `server/db/schema.sql`, `server/src/core`, `server/src/routes`, client API hooks, and the named tests. The HTTP API is a prototype transport boundary and is not the intended final Android architecture.
+
+## Confirmed domain behavior
 
 ### Structure and occupancy
 
-Property → floor → room → bed are linked by FKs. Bed has `is_active` 0/1. Occupancy query determines assignment at date using `start_date <= date AND (end_date_exclusive IS NULL OR end_date_exclusive > date)`. Move-in checks bed existence, active state, and overlaps; it does not verify that bed's floor/property corresponds to payload `propertyId` (finding A-01). Database does not enforce overlap exclusion or unique active assignment. Tests cover common overlap rejection in repositories/workflows, not concurrent requests.
+Property → floor → room → bed relationships use foreign keys. Occupancy at a date uses `start_date <= date AND (end_date_exclusive IS NULL OR end_date_exclusive > date)`. Move-in checks property existence, bed existence/activity, bed/property hierarchy ownership, and overlapping assignments before writing. The cross-property guard is in the workflow; the schema does not enforce it for direct database writes.
 
-### Tenant, assignment, move-in, shifts, checkout
+### Tenant lifecycle and assignments
 
-Tenant status is `ACTIVE`/`CHECKED_OUT`. Move-in creates tenant, assignment, rental term, optional deposit, and first obligation in one transaction. Shift closes the old assignment and inserts a new one on `shiftDate`; shift date may equal start date under current comparison, potentially yielding invalid zero-length prior interval because schema does not check assignments (open issue). Checkout similarly closes assignment and term at `checkoutDate`, marks tenant checked out; it does not settle deposit or explicitly reconcile obligations beyond checkout. Future checkout versus existing future periods is unresolved. Repositories keep assignment history; tests cover one shift and checkout cases.
+Tenant status is `ACTIVE` or `CHECKED_OUT`. Move-in writes tenant, assignment, rental term, optional deposit, and first obligation in one transaction. Bed shift closes the prior assignment at the shift date and opens the target assignment in one transaction. Checkout closes the active assignment and rental term, then updates tenant status/date in one transaction.
 
-### Billing, rent, obligations, payment, ledger
+Confirmed rules: same-calendar-day shifts and checkout are rejected; an assignment must span at least one calendar day; Jan 10 to Jan 11 is a valid one-day assignment; rejected operations preserve database state. Current error names differ: shift throws `SHIFT_DATE_BEFORE_START_DATE`; checkout throws `CHECKOUT_DATE_MUST_BE_AFTER_START_DATE`. Tests are in `server/test/workflows/{shiftBedWorkflow,moveOutWorkflow}.test.js` and `server/test/audit/a05AssignmentIntervalRules.test.js`.
 
-Rental terms use `[effective_from,effective_to_exclusive)` semantics. `computeNextBillingPeriod` preserves original anchor day, clamping to month length (Jan 31→Feb 28/29; then March uses original anchor), and returns period start/end; `dueDateOffsetDays` is accepted but unused and `dueDate` currently equals period start. No proration calculation is implemented in this policy; move-in creates an obligation from joining date to next anchored period using full `rentPaise`. Whether that is intended billing policy is unknown. Payment collection generates periods while latest obligation end `<= paidOn`, allocates FIFO by period start, due date, ID, and leaves excess as unallocated credit. Allocation policy supports integer paise and partial allocations. Ledger computes outstanding as obligations minus allocated sums and credit as payment totals minus allocations. The source has no persisted credit ledger or automatic future allocation beyond each payment's allocation behavior.
+The later schema triggers enforce interval non-emptiness and prevent bed/tenant overlaps on direct inserts and relevant updates. Checkout treatment of future obligations remains unresolved; see the current [database reference](../database_schema.md) and [workflow reference](../workflows_and_queries.md).
 
-Overdue policy in queries compares `due_date < asOfDate`; due today is not overdue. Tenant directory computes due/credit status using UTC current day. Collection validates paidOn but does not require active tenant status. Idempotency key is unique in DB; repeat key returns old payment regardless of payload (A-04).
+### Billing, obligations, and payments
 
-### Deposit and settlement
+Rental terms use half-open date intervals. Billing periods preserve the joining-day anchor and clamp to shorter months. `dueDateOffsetDays` is accepted but unused; due date currently equals period start. Move-in creates its first obligation for the full `rentPaise`, without proration. These are observed mechanics; intended offset and proration policy remain undecided.
 
-Deposit status is HELD/SETTLED; a settlement is unique per deposit. Policy accepts itemized positive paise deductions with nonblank reasons; refund is max(deposit−deductions,0), liability max(deductions−deposit,0). It permits deductions above deposit, which tests explicitly cover. Business meaning/collection of remaining liability is not implemented beyond recording total.
+Payment collection validates date and positive integer paise, generates subsequent obligations when due, allocates FIFO by period start, due date, then ID, and leaves excess as unallocated credit. The idempotency branch compares tenant, amount, paid date, payment method, and reference note. Identical retries return the original payment; differing compared fields throw `IDEMPOTENCY_KEY_CONFLICT`. The workflow and rollback tests are in `server/test/workflows/collectPaymentWorkflow.test.js`.
 
-### Validation and test evidence
+Overdue comparisons use `due_date < asOfDate`; a due date equal to the as-of date is not overdue. Collection checks tenant existence but does not require ACTIVE status. No persisted credit account exists.
 
-`dateUtils.js` validates strict real `YYYY-MM-DD` calendar dates. Mutation workflows call it for their date inputs. Query route dates have no equivalent validation at the route boundary. SQLite enforces listed CHECK/UNIQUE/FK rules; many cross-row invariants are application-only or absent. Coverage is mapped in [frontend and test reference](04_FRONTEND_AND_TESTING_REFERENCE.md) and [audit](05_AUDIT_FINDINGS.md). No claim is made that tests were run during this documentation audit.
+### Financial reporting: current mechanics, unresolved meaning
 
-## HTTP API (`/api/v1`)
+`getFinancialSummary` aggregates billed obligations, allocated amounts, outstanding balances, payments, and deposits across the property without a month filter; the supplied date affects occupancy and overdue status. `getPropertyOccupancyTree` selects obligations in the displayed cycle **or any obligation with a positive outstanding balance**. These are different scopes. The dashboard currently reads occupancy data and labels those values “Cycle Rent Obligations”. `useFinancials`, `MonthPicker`, and `FinancialSummaryCard` exist but are not currently wired into `PaymentsScreen`; that screen currently derives its outstanding queue from the active tenant directory.
 
-All mounted routes are in `server/src/routes`. Successful route responses use `{data: payload}`. Most successful GET/POST/PATCH/DELETE statuses are shown below. There is no auth requirement because no authentication layer is present; unauthenticated access is the current behavior. The API is a transport adapter and should not become a permanent core dependency in the Android target.
+No monthly total definition is inferred here. See [A-03 in the audit matrix](../AUDIT_TEST_MATRIX.md) and [decisions](../DECISIONS.md) before adding expected financial totals.
 
-| Method and path | Request | Success |
+### Deposits
+
+Deposits are HELD or SETTLED. A deposit has at most one settlement. Deductions require positive paise and a nonblank reason; deductions may exceed deposit, leaving a recorded liability. Collection of that liability is not implemented. See settlement workflow tests before treating any other deposit behavior as established.
+
+## Domain validation and HTTP error mapping
+
+Date utilities validate strict real `YYYY-MM-DD` calendar dates; mutation workflows call them. Amount workflows require positive integer paise where applicable. These are domain checks, independent of HTTP mapping.
+
+The Express error handler maps known `.code` values to status codes and returns `{error:{code,message,details}}`; unmapped errors become generic 500 responses. Date utility errors do not set stable `.code`. The checkout workflow's current `CHECKOUT_DATE_MUST_BE_AFTER_START_DATE` is not in the status map (which contains the older `CHECKOUT_DATE_BEFORE_START_DATE`), so the HTTP adapter can return generic 500 for that domain rejection. Query date inputs lack route-level validation. This is a temporary API concern, tracked separately as A-07.
+
+## Current HTTP API (`/api/v1`)
+
+Mounted routes are in `server/src/routes/`. Success payloads are wrapped in `{data: payload}`.
+
+| Method and path | Request | Observed success |
 |---|---|---|
-| GET `/properties` | none | 200 `{data: properties[]}` |
+| GET `/properties` | none | 200 `{data: properties}` |
 | POST `/properties` | `{name,address}` | 201 `{data: property}` |
-| GET `/properties/:id/occupancy?date=` | optional query date | 200 occupancy read model; missing property passes `PROPERTY_NOT_FOUND` |
-| POST `/floors` | `{propertyId,displayOrder,name}` | 201 floor |
-| DELETE `/floors/:id` | none | 200 `{success:true}` if empty |
-| POST `/rooms` | `{floorId,roomNumber}` | 201 room |
-| DELETE `/rooms/:id` | none | 200 success if empty |
-| POST `/beds` | `{roomId,bedLabel,isActive?}` | 201 bed |
-| PATCH `/beds/:id/toggle-active` | `{isActive}` | 200 bed / `BED_NOT_FOUND` |
-| DELETE `/beds/:id` | none | 200 success if no assignment history |
-| GET `/tenants?propertyId=&status=&search=&paymentStatus=` | filters | 200 tenant directory; propertyId is effectively required by query |
-| POST `/tenants/move-in` | `{propertyId,bedId,name,phone,joiningDate,rentPaise,depositPaise?,dueDate?}` | 201 created records |
-| POST `/tenants/:id/shift-bed` | `{targetBedId,shiftDate}` | 200 closed/new assignment |
-| POST `/tenants/:id/checkout` | `{checkoutDate}` | 200 tenant and closed assignment |
-| POST `/tenants/:id/collect-payment` | `{amountPaise,paidOn,paymentMethod,referenceNote?,idempotencyKey?,nextDueDateOverride?}` | 200 payment, allocations, `unallocatedPaise`, `isDuplicate` |
-| POST `/tenants/:id/settle-deposit` | `{depositId?,deductions?}` | 200 deposit/settlement/deductions; route uses body depositId or path ID as depositId |
-| POST `/deposits/:id/settle` | `{deductions?}` | 200 same settlement result |
-| GET `/tenants/:id/ledger` | none | 200 ledger; missing tenant error |
-| GET `/financials/summary?propertyId=&date=` | propertyId and optional date | 200 summary |
+| PATCH `/properties/:id` | `{name,address}` | 200 `{data: updatedProperty}`; absent property maps to 404 `PROPERTY_NOT_FOUND` |
+| GET `/properties/:id/occupancy?date=` | optional date | 200 occupancy read model; missing property passes `PROPERTY_NOT_FOUND` |
+| POST `/floors`, `/rooms`, `/beds` | structure fields | 201 `{data: createdRecord}` |
+| DELETE `/floors/:id`, `/rooms/:id`, `/beds/:id` | none | 200 success when workflow permits deletion |
+| PATCH `/beds/:id/toggle-active` | `{isActive}` | 200 bed or `BED_NOT_FOUND` |
+| GET `/tenants` | property and optional filters | 200 tenant directory |
+| POST `/tenants/move-in` | property/bed/tenant/date/amount fields | 201 created tenant, assignment, rental term, deposit, obligation |
+| POST `/tenants/:id/shift-bed` | `{targetBedId,shiftDate}` | 200 closed and new assignments |
+| POST `/tenants/:id/checkout` | `{checkoutDate}` | 200 updated tenant and closed assignment |
+| POST `/tenants/:id/collect-payment` | amount/date/method and optional reference/idempotency/due override | 200 payment, allocations, credit, duplicate flag |
+| POST `/tenants/:id/settle-deposit`, `/deposits/:id/settle` | optional deductions | 200 settlement result |
+| GET `/tenants/:id/ledger` | none | 200 ledger |
+| GET `/financials/summary?propertyId=&date=` | property and optional date | 200 financial summary |
 
-Property CRUD is incomplete: client `useUpdateProperty` sends PATCH `/properties/:id`, but no server handler exists (A-02). Client property settings also rely on details not shown to have a matching write endpoint. Error middleware returns `{error:{code,message,details}}`; mapped business codes yield 400/404/409; unknown errors and unrecognized SQLite errors become generic 500. Route-level request schemas are absent. Query/read response shape detail lives in source modules; the public shapes are occupancy, tenant directory, financial summary, and ledger as listed below.
-
-### Read model shape summary
-
-- Occupancy: property and billingCycle; summary counts/financials; nested floors → rooms → beds. Bed carries status/paymentStatus and optional tenant with current debt.
-- Tenant directory: tenant identity/status/dates, nullable `currentBed`, `balances:{totalOutstandingPaise,overduePaise,advanceCreditPaise,paymentStatus}`.
-- Ledger: tenant, financial totals, allocations, chronological event timeline (obligation/payment/deposit/settlement/assignment).
-- Financial summary: bed counts, active tenant count, all-time bill/payment/deposit amounts plus overdue calculated at date. Date does not scope billed/collected to a month.
-
-The complete field construction and SQL mechanics are in `server/src/core/queries/{occupancyQueries,tenantQueries,ledgerQueries,financialQueries}.js`; see A-03 for financial scope limitation.
+There is no authentication/authorization layer. The API, CORS configuration, and error envelope serve the current prototype only. Do not expand them for Android unless the prototype requires it; any remote sync or multi-user target needs its own security design.

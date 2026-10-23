@@ -1,4 +1,4 @@
-# Historical snapshot — superseded by [docs/README.md](README.md), especially [architecture](context/01_SYSTEM_ARCHITECTURE_OVERVIEW.md), [frontend/testing](context/04_FRONTEND_AND_TESTING_REFERENCE.md), and [audit findings](context/05_AUDIT_FINDINGS.md). Kept for history.
+# Historical snapshot — retained for history. Use the [current documentation index](../README.md), [architecture](../context/01_SYSTEM_ARCHITECTURE_OVERVIEW.md), [frontend/testing](../context/04_FRONTEND_AND_TESTING_REFERENCE.md), and [audit findings](../context/05_AUDIT_FINDINGS.md); this snapshot is not current authority.
 
 # Stay Ledger V1 Frontend — Architecture Audit & State Baseline
 

@@ -1,4 +1,6 @@
-# Database, Persistence, and Core Reference
+# Historical Database, Persistence, and Core Reference
+
+> Retained as a reference snapshot. The canonical current schema is [database_schema.md](../database_schema.md), with current repository behavior in [repo.md](../repo.md) and workflow behavior in [workflows_and_queries.md](../workflows_and_queries.md). Later A-05 work added insert/update assignment triggers; the earlier “not enforced” summary below is outdated.
 
 ## Schema inventory
 
@@ -20,7 +22,7 @@ SQLite schema is `server/db/schema.sql`. IDs are text PKs; timestamps/dates are 
 | `deposit_settlements` | id, deposit_id, tenant_id, deductions_total_paise, refund_paise, remaining_liability_paise, settled_at | deposit unique; both FKs RESTRICT; totals >=0 |
 | `deposit_deductions` | id, settlement_id, amount_paise, reason | settlement RESTRICT; amount >0; trimmed reason nonempty |
 
-Not enforced by schema: overlap/exclusion for assignment or term periods; one active assignment per tenant/bed; cross-property tenant/bed consistency; allocation totals bounded by payment/obligation; unique floor order/room number/bed label. Some are workflow-checked; some are not. `db_integration.test.js` checks selected FK, unique, period, idempotency, and amount constraints.
+Not enforced by schema: rental-term overlap/exclusion; cross-property tenant/bed consistency; allocation totals bounded by payment/obligation; unique floor order/room number/bed label. Assignment interval non-emptiness and bed/tenant overlap are now enforced by schema triggers. Some other invariants are workflow-checked; some are not. `db_integration.test.js` checks selected FK, unique, period, idempotency, and amount constraints.
 
 ## Initialization, migrations, backup
 

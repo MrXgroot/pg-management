@@ -1,16 +1,12 @@
-# React + Vite
+# Stay Ledger web client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This directory contains the current React/Vite browser client. Project overview and architecture are in the [repository README](../README.md) and [documentation index](../docs/README.md).
 
-Currently, two official plugins are available:
+## Commands
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `npm install` — install client dependencies.
+- `npm run dev` — start Vite on port 5173; `/api` requests proxy to `http://localhost:4000`.
+- `npm run build` — create a production web build.
+- `npm run lint` — run ESLint.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The client calls the temporary Express API. There is no client test script or Android UI in this package. The intended Android architecture remains undecided; see [Android migration planning](../docs/context/06_ANDROID_MIGRATION.md).

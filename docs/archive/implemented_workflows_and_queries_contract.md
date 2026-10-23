@@ -1,4 +1,4 @@
-# Historical snapshot — superseded by [docs/README.md](README.md), [domain/API contract](context/02_API_AND_DATA_CONTRACTS.md), and [persistence/core reference](context/03_DATABASE_AND_CORE_REFERENCE.md). Kept for history; source code is authoritative.
+# Historical snapshot — retained for history. Use the [current documentation index](../README.md), [domain/API reference](../context/02_API_AND_DATA_CONTRACTS.md), and [persistence/core reference](../context/03_DATABASE_AND_CORE_REFERENCE.md); this snapshot is not authoritative.
 
 # Implemented Workflows and Queries Contract — Stay Ledger V1
 

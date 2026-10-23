@@ -1,4 +1,4 @@
-# Historical snapshot — superseded by [docs/README.md](README.md) and its [current persistence/core reference](context/03_DATABASE_AND_CORE_REFERENCE.md). Kept for history; source code is authoritative.
+# Historical snapshot — retained for history. Use the [current documentation index](../README.md) and [persistence/core reference](../context/03_DATABASE_AND_CORE_REFERENCE.md); this snapshot is not authoritative.
 
 # Implemented Repositories Contract Snapshot — Stay Ledger V1
 

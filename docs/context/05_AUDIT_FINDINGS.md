@@ -1,6 +1,6 @@
-# Prioritized Audit Findings
+# Original Prioritized Audit Findings
 
-Static source audit of this working tree. Findings distinguish confirmed contract gaps from concurrency/semantic risks. No app was run, no database changed, and no tests were executed during this docs task.
+This document preserves the original static audit record. Its audit date/revision was not recorded here, and several implementation claims are now stale. In particular, current source/tests address the workflow cases in A-01, A-02, A-04, and the same-day part of A-05. Do not use the original actual/expected sections below as current status. See the [current audit test matrix](../AUDIT_TEST_MATRIX.md) for verified evidence, present status, and remaining resolution criteria. The original audit made no app/database/test changes.
 
 ## A-01 — Move-in does not verify bed belongs to property
 
